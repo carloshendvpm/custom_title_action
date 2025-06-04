@@ -88,7 +88,7 @@ async function run(){
       repo,
       pull_number: prNumber,
       title: newTitle,
-      body: finalBody,
+      body: newDescription,
     });
     core.info(`✅ Título do PR atualizado para: "${newTitle}"`);
     core.info(`📝 Descrição do PR atualizada: "${newDescription}"`);
