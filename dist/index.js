@@ -40085,7 +40085,15 @@ async function run(){
 
     const commitMessages = commits.map(commit => commit.commit.message).join('\n');
 
-    const prompt = `Gere um título breve e descritivo para um Pull Request com base nessas mensagens de commit:\n\n${commitMessages}`;
+    const prompt = `
+    Você é um assistente que gera títulos curtos de Pull Requests seguindo o padrão de Conventional Commits.
+
+    Com base nas mensagens de commit abaixo, gere um título de PR sucinto (máximo 70 caracteres), começando com um prefixo apropriado como \`feat:\`, \`fix:\`, \`refactor:\`, \`chore:\`, etc. Use linguagem clara, objetiva e sem emojis.
+
+    Mensagens de commit:
+    ${commitMessages}
+    `.trim();
+    
     let geminiResponse;
     try {
       geminiResponse = await axios.post(
