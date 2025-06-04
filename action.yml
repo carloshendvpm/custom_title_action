@@ -1,0 +1,12 @@
+name: 'Gerar títulos de PR automaticamente com IA'
+description: 'Atualiza o título do PR com base nos commits usando OpenAI'
+inputs:
+  github-token:
+    description: 'GitHub Token'
+    required: true
+  gemini-token:
+    description: 'Token da API OpenAI'
+    required: true
+runs:
+  using: 'node20'
+  main: 'index.js'
