@@ -23,7 +23,6 @@ jobs:
 
       - name: Install dependencies and run action
         run: |
-          cd auto-title
           npm install
           node index.js
         env:
