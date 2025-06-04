@@ -35,7 +35,7 @@ async function run(){
     let geminiResponse;
     try {
       geminiResponse = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
         {
           contents: [
             {
