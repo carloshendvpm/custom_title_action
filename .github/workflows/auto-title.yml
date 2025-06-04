@@ -2,7 +2,7 @@ name: Auto Title PR with Gemini
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, labeled]
 
 permissions:
   pull-requests: write
@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   generate-title:
+    if: github.event.label.name == 'generate-title'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
