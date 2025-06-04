@@ -40073,6 +40073,12 @@ async function run(){
       core.setFailed('This action can only be run on pull requests.');
       return;
     }
+    const label = context.payload.label?.name;
+
+    if (label !== 'generate-title') {
+      core.info(`🏷️ Label recebida: "${label}". Ignorando PR sem a label "generate-title".`);
+      return;
+    }
 
     const { owner, repo } = context.repo;
     const prNumber = pr.number;
@@ -40093,7 +40099,7 @@ async function run(){
     Mensagens de commit:
     ${commitMessages}
     `.trim();
-    
+
     let geminiResponse;
     try {
       geminiResponse = await axios.post(
