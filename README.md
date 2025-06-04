@@ -1,6 +1,6 @@
-## 📌 O que este PR faz
+## 📌 O que essa action faz?
 
-Este PR implementa a automação da geração de títulos de Pull Requests utilizando a API Gemini. A ideia é gerar um título curto e descritivo com base nas mensagens de commit, seguindo o padrão de Conventional Commits.
+Essa Action implementa a automação da geração de títulos de Pull Requests utilizando a API Gemini. A ideia é gerar um título curto e descritivo com base nas mensagens de commit, seguindo o padrão de Conventional Commits.
 
 ## ⚙️ Como funciona
 
