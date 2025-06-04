@@ -40058,11 +40058,17 @@ const axios = __nccwpck_require__(3512);
 
 async function run(){
   try {
-    const githubToken = core.getInput('github-token');
-    const geminiKey = core.getInput('gemini-token');
+    const githubToken = core.getInput('github-token', { required: true });
+    const geminiKey = core.getInput('gemini-token', { required: true });
+
+    if (!githubToken || !geminiKey) {
+      core.setFailed('Os tokens do GitHub e Gemini são obrigatórios.');
+      return;
+    }
+
     const octokit = github.getOctokit(githubToken);
     const context = github.context;
-    let pr = context.payload.pull_request;
+    const pr = context.payload.pull_request;
     if (!pr) {
       core.setFailed('This action can only be run on pull requests.');
       return;
@@ -40076,20 +40082,42 @@ async function run(){
       repo,
       pull_number: prNumber
     });
+
     const commitMessages = commits.map(commit => commit.commit.message).join('\n');
 
     const prompt = `Gere um título breve e descritivo para um Pull Request com base nessas mensagens de commit:\n\n${commitMessages}`;
-    
-    const geminiResponse = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiKey}`,
-      {
-        contents: [
-          {
-            parts: [{ text: prompt }]
+    let geminiResponse;
+    try {
+      geminiResponse = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${geminiKey}`,
+        {
+          contents: [
+            {
+              parts: [
+                {
+                  text: prompt
+                }
+              ]
+            }
+          ]
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json'
           }
-        ]
+        }
+      );
+      core.info('Resposta da API Gemini recebida com sucesso.');
+    } catch (geminiApiError) {
+      if (geminiApiError.response) {
+        core.setFailed(`❌ Erro da API Gemini: Status ${geminiApiError.response.status} - ${JSON.stringify(geminiApiError.response.data)}`);
+      } else if (geminiApiError.request) {
+        core.setFailed(`❌ Erro de rede ao chamar a API Gemini: ${geminiApiError.message}`);
+      } else {
+        core.setFailed(`❌ Erro desconhecido na API Gemini: ${geminiApiError.message}`);
       }
-    );
+      return;
+    }
 
     const newTitle = geminiResponse.data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 
@@ -40107,13 +40135,13 @@ async function run(){
     core.info(`✅ Título atualizado: ${newTitle}`);
   } catch (error) {
     core.setFailed(`❌ Erro ao atualizar o título do PR: ${error.message}`);
-  }
-  finally {
+  } finally {
     core.info('Ação concluída.');
   }
 }
 
 run();
+
 module.exports = __webpack_exports__;
 /******/ })()
 ;
