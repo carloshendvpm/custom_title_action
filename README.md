@@ -24,3 +24,4 @@ Essa Action implementa a automação da geração de títulos de Pull Requests u
 
 ## 🚀 Próximas features
 - [ ] Links automáticos de CLICKUP-ID com base no nome da branch.
+- [ ] Gerar PR descriptions automaticamente.
