@@ -2,7 +2,7 @@ name: Auto Title PR with Gemini
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [labeled]
 
 permissions:
   pull-requests: write
