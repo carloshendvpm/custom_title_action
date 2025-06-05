@@ -1,5 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
-
+const { GoogleGenAI } = require('@google/genai');
 
 async function callGemini(prompt, geminiKey) {
   const ai = new GoogleGenAI({ apiKey: geminiKey });
