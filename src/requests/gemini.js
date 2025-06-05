@@ -15,7 +15,7 @@ async function callGemini(prompt, geminiKey) {
       temperature: 0.3,
     },
   });
-  return core.log(response)
+  return core.info(response)
 }
 
 module.exports = { callGemini };
