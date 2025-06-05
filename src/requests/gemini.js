@@ -1,11 +1,20 @@
-const axios = require('axios');
+import { GoogleGenAI } from "@google/genai";
 
-async function callGemini(prompt, geminiKey) {
-  const response = await axios.post(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
-    { contents: [{ parts: [{ text: prompt }] }] },
-    { headers: { 'Content-Type': 'application/json' } }
-  );
+const ai = new GoogleGenAI({ apiKey: geminiKey });
+
+async function callGemini(prompt) {
+  const contents = [];
+
+  contents.push({ role: 'user', parts: [{ text: prompt }] });
+
+  const response = await ai.models.generateContent({
+    model: "gemini-2.0-flash",
+    contents: contents,
+    config: {
+      maxOutputTokens: 80,
+      temperature: 0.3,
+    },
+  });
   return response.data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 }
 
