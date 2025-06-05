@@ -54985,6 +54985,7 @@ function socketOnError() {
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 const { GoogleGenAI } = __nccwpck_require__(6252);
+const core = __nccwpck_require__(4685);
 
 async function callGemini(prompt, geminiKey) {
   const ai = new GoogleGenAI({ apiKey: geminiKey });
@@ -55000,7 +55001,7 @@ async function callGemini(prompt, geminiKey) {
       temperature: 0.3,
     },
   });
-  return response.data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  return core.log(response)
 }
 
 module.exports = { callGemini };

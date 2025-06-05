@@ -1,4 +1,5 @@
 const { GoogleGenAI } = require('@google/genai');
+const core = require('@actions/core');
 
 async function callGemini(prompt, geminiKey) {
   const ai = new GoogleGenAI({ apiKey: geminiKey });
@@ -14,7 +15,7 @@ async function callGemini(prompt, geminiKey) {
       temperature: 0.3,
     },
   });
-  return response.data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  return core.log(response)
 }
 
 module.exports = { callGemini };
