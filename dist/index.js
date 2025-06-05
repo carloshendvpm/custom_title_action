@@ -75079,9 +75079,9 @@ function getApiKeyFromEnv() {
 /* module decorator */ module = __nccwpck_require__.hmd(module);
 
 
-const ai = new GoogleGenAI({ apiKey: geminiKey });
 
-async function callGemini(prompt) {
+async function callGemini(prompt, geminiKey) {
+  const ai = new GoogleGenAI({ apiKey: geminiKey });
   const contents = [];
 
   contents.push({ role: 'user', parts: [{ text: prompt }] });
