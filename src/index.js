@@ -1,9 +1,9 @@
 const core = require('@actions/core');
 const github = require('@actions/github');
-const { callGemini } = require('./gemini');
-const { buildTitlePrompt, buildDescriptionPrompt } = require('./prompts');
-const { getPullRequestData } = require('./github');
-const { hasLabel, loadCustomTemplate } = require('./helpers');
+const { callGemini } = require('./requests/gemini');
+const { buildTitlePrompt, buildDescriptionPrompt } = require('./utils/prompts');
+const { getPullRequestData } = require('./requests/github');
+const { hasLabel, loadCustomTemplate } = require('./utils/helpers');
 
 async function run() {
   try {
