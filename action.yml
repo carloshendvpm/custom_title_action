@@ -11,6 +11,10 @@ inputs:
     description: 'Label para acionar a ação'
     required: false
     default: 'generate-title'
+  custom-pr-template-path:
+    description: 'Caminho para o template customizado do PR'
+    required: false
+    default: '.github/pull_request_template.md'
 branding:
   icon: 'terminal'
   color: 'blue'
