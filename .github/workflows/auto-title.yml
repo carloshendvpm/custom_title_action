@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   generate-title:
-    if: github.event.label.name == 'generate-title'
+    if: github.event.label.name == 'generate-title' || github.event.label.name == 'generate-full-pr' || github.event.label.name == 'generate-description'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
