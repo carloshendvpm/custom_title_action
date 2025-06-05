@@ -16,7 +16,7 @@ async function callGemini(prompt, geminiKey) {
         temperature: 0.3,
       },
     });
-    return core.info(response.text)
+    return response.text.trim();
   } catch(error) {
     core.setFailed(`Erro ao chamar Gemini: ${error.message}`);
     throw error; 
