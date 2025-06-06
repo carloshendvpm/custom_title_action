@@ -54999,10 +54999,11 @@ async function callGemini(prompt, geminiKey) {
       contents: contents,
       config: {
         maxOutputTokens: 80,
+        systemInstruction: "Você é um assistente de IA especializado em ajudar desenvolvedores a gerar títulos e descrições de Pull Requests no GitHub.",
         temperature: 0.3,
       },
     });
-    return response.text.trim();
+    return response?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
   } catch(error) {
     core.setFailed(`Erro ao chamar Gemini: ${error.message}`);
     throw error; 
