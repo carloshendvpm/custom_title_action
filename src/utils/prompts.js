@@ -1,16 +1,11 @@
 function buildTitlePrompt(commitMessages) {
-  return `
-Você é um assistente que gera títulos de PR no estilo Conventional Commits.
-
-Mensagens de commit:
-${commitMessages}
-`.trim();
+  return `Mensagens de commit:
+  ${commitMessages}
+  `.trim();
 }
 
 function buildDescriptionPrompt(files, customTemplate) {
   return customTemplate || `
-  Você é um assistente técnico. Gere uma descrição de Pull Request com base nos arquivos modificados listados abaixo. Use tópicos curtos para descrever o que foi alterado, com foco em clareza e impacto técnico.
-
   Arquivos modificados:
   ${modifiedFiles}
 

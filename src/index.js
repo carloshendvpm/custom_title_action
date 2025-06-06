@@ -3,7 +3,7 @@ const github = require('@actions/github');
 const { callGemini } = require('./requests/gemini');
 const { buildTitlePrompt, buildDescriptionPrompt } = require('./utils/prompts');
 const { getPullRequestData } = require('./requests/github');
-const { hasLabel, loadCustomTemplate } = require('./utils/helpers');
+const { hasLabel, loadCustomTemplate, titleSysInstruction, descriptionSysInstruction } = require('./utils/helpers');
 
 async function run() {
   try {
@@ -36,13 +36,13 @@ async function run() {
 
     if (generateTitle) {
       const prompt = buildTitlePrompt(commitMessages);
-      updates.title = await callGemini(prompt, geminiKey);
+      updates.title = await callGemini(prompt, geminiKey, titleSysInstruction);
       core.info(`✅ Novo título: ${updates.title}`);
     }
 
     if (generateDescription) {
       const prompt = buildDescriptionPrompt(modifiedFiles, customTemplate);
-      updates.body = await callGemini(prompt, geminiKey);
+      updates.body = await callGemini(prompt, geminiKey, descriptionSysInstruction);
       core.info(`📝 Nova descrição gerada.`);
     }
 

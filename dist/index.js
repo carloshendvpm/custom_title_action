@@ -54990,7 +54990,7 @@ const core = __nccwpck_require__(4685);
 
 
 
-async function callGemini(prompt, geminiKey) {
+async function callGemini(prompt, geminiKey, systemInstruction) {
   try {
     const ai = new GoogleGenAI({ apiKey: geminiKey });
     const contents = [];
@@ -55002,14 +55002,7 @@ async function callGemini(prompt, geminiKey) {
       contents: contents,
       config: {
         maxOutputTokens: 80,
-        systemInstruction: `Você é um assistente que gera títulos de Pull Request no estilo Conventional Commits.
-        Regras:
-        - Gere apenas 1 título.
-        - Máximo de 70 caracteres.
-        - Não explique nem justifique o título.
-        - Não adicione ponto final.
-        - Use apenas os tipos: feat, fix, chore, docs, refactor, test.
-        - Combine mensagens similares em um só título se necessário.`,
+        systemInstruction: systemInstruction || "Você é um assistente de IA especializado em ajudar desenvolvedores a criar títulos e descrições de PRs no GitHub.",
         temperature: 0.1,
       },
     });
@@ -55057,7 +55050,19 @@ function loadCustomTemplate(path) {
   return fs.readFileSync(path, 'utf-8');
 }
 
-module.exports = { hasLabel, loadCustomTemplate };
+
+const titleSysInstruction =`Você é um assistente que gera títulos de Pull Request no estilo Conventional Commits.
+        Regras:
+        - Gere apenas 1 título.
+        - Máximo de 70 caracteres.
+        - Não explique nem justifique o título.
+        - Não adicione ponto final.
+        - Use apenas os tipos: feat, fix, chore, docs, refactor, test.
+        - Combine mensagens similares em um só título se necessário.`
+
+const descriptionSysInstruction = `Você é um assistente técnico. Gere uma descrição de Pull Request com base nos arquivos modificados listados abaixo. Use tópicos curtos para descrever o que foi alterado, com foco em clareza e impacto técnico.`
+
+module.exports = { hasLabel, loadCustomTemplate, titleSysInstruction, descriptionSysInstruction };
 
 
 /***/ }),
@@ -55066,18 +55071,13 @@ module.exports = { hasLabel, loadCustomTemplate };
 /***/ ((module) => {
 
 function buildTitlePrompt(commitMessages) {
-  return `
-Você é um assistente que gera títulos de PR no estilo Conventional Commits.
-
-Mensagens de commit:
-${commitMessages}
-`.trim();
+  return `Mensagens de commit:
+  ${commitMessages}
+  `.trim();
 }
 
 function buildDescriptionPrompt(files, customTemplate) {
   return customTemplate || `
-  Você é um assistente técnico. Gere uma descrição de Pull Request com base nos arquivos modificados listados abaixo. Use tópicos curtos para descrever o que foi alterado, com foco em clareza e impacto técnico.
-
   Arquivos modificados:
   ${modifiedFiles}
 
@@ -77533,7 +77533,7 @@ const github = __nccwpck_require__(5793);
 const { callGemini } = __nccwpck_require__(8632);
 const { buildTitlePrompt, buildDescriptionPrompt } = __nccwpck_require__(8289);
 const { getPullRequestData } = __nccwpck_require__(8664);
-const { hasLabel, loadCustomTemplate } = __nccwpck_require__(9635);
+const { hasLabel, loadCustomTemplate, titleSysInstruction, descriptionSysInstruction } = __nccwpck_require__(9635);
 
 async function run() {
   try {
@@ -77566,13 +77566,13 @@ async function run() {
 
     if (generateTitle) {
       const prompt = buildTitlePrompt(commitMessages);
-      updates.title = await callGemini(prompt, geminiKey);
+      updates.title = await callGemini(prompt, geminiKey, titleSysInstruction);
       core.info(`✅ Novo título: ${updates.title}`);
     }
 
     if (generateDescription) {
       const prompt = buildDescriptionPrompt(modifiedFiles, customTemplate);
-      updates.body = await callGemini(prompt, geminiKey);
+      updates.body = await callGemini(prompt, geminiKey, descriptionSysInstruction);
       core.info(`📝 Nova descrição gerada.`);
     }
 
