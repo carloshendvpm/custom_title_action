@@ -26,3 +26,6 @@ Essa Action implementa a automação da geração de títulos e descrição de P
 - [ ] Links automáticos de CLICKUP-ID com base no nome da branch.
 - [x] Gerar PR descriptions automaticamente.
 - [ ] Arquivos de templates custom do usuário.
+
+## Contribuir
+Se sinta livre para abrir issues ou sugerir modificações.
