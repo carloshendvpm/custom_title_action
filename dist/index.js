@@ -54990,7 +54990,7 @@ const core = __nccwpck_require__(4685);
 
 
 
-async function callGemini(prompt, geminiKey, systemInstruction) {
+async function callGemini(prompt, geminiKey, systemInstruction, maxOutputTokens = 80) {
   try {
     const ai = new GoogleGenAI({ apiKey: geminiKey });
     const contents = [];
@@ -55001,7 +55001,7 @@ async function callGemini(prompt, geminiKey, systemInstruction) {
       model: "gemini-2.0-flash",
       contents: contents,
       config: {
-        maxOutputTokens: 80,
+        maxOutputTokens: maxOutputTokens,
         systemInstruction: systemInstruction || "Você é um assistente de IA especializado em ajudar desenvolvedores a criar títulos e descrições de PRs no GitHub.",
         temperature: 0.1,
       },
@@ -77572,7 +77572,7 @@ async function run() {
 
     if (generateDescription) {
       const prompt = buildDescriptionPrompt(modifiedFiles, customTemplate);
-      updates.body = await callGemini(prompt, geminiKey, descriptionSysInstruction);
+      updates.body = await callGemini(prompt, geminiKey, descriptionSysInstruction, 500);
       core.info(`📝 Nova descrição gerada.`);
     }
 

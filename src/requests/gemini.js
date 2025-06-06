@@ -4,7 +4,7 @@ const core = require('@actions/core');
 
 
 
-async function callGemini(prompt, geminiKey, systemInstruction) {
+async function callGemini(prompt, geminiKey, systemInstruction, maxOutputTokens = 80) {
   try {
     const ai = new GoogleGenAI({ apiKey: geminiKey });
     const contents = [];
@@ -15,7 +15,7 @@ async function callGemini(prompt, geminiKey, systemInstruction) {
       model: "gemini-2.0-flash",
       contents: contents,
       config: {
-        maxOutputTokens: 80,
+        maxOutputTokens: maxOutputTokens,
         systemInstruction: systemInstruction || "Você é um assistente de IA especializado em ajudar desenvolvedores a criar títulos e descrições de PRs no GitHub.",
         temperature: 0.1,
       },

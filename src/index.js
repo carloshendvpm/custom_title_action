@@ -42,7 +42,7 @@ async function run() {
 
     if (generateDescription) {
       const prompt = buildDescriptionPrompt(modifiedFiles, customTemplate);
-      updates.body = await callGemini(prompt, geminiKey, descriptionSysInstruction);
+      updates.body = await callGemini(prompt, geminiKey, descriptionSysInstruction, 500);
       core.info(`📝 Nova descrição gerada.`);
     }
 
