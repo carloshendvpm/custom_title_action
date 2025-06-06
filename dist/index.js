@@ -55076,8 +55076,8 @@ function buildTitlePrompt(commitMessages) {
   `.trim();
 }
 
-function buildDescriptionPrompt(files, customTemplate) {
-  return customTemplate || `
+function buildDescriptionPrompt(modifiedFiles) {
+  return`
   Arquivos modificados:
   ${modifiedFiles}
 
