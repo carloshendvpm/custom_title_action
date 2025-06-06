@@ -7,6 +7,18 @@ inputs:
   gemini-token:
     description: 'Token da API OpenAI'
     required: true
+  label:
+    description: 'Label para acionar a ação'
+    required: false
+    default: 'generate-title'
+  custom-pr-template-path:
+    description: 'Caminho para o template customizado do PR'
+    required: false
+    default: '.github/pull_request_template.md'
+branding:
+  icon: 'terminal'
+  color: 'blue'
+
 runs:
   using: 'node20'
   main: 'dist/index.js'
