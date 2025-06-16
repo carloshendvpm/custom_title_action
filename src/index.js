@@ -1,61 +1,101 @@
 const core = require('@actions/core');
 const github = require('@actions/github');
-const { callGemini } = require('./requests/gemini');
-const { buildTitlePrompt, buildDescriptionPrompt } = require('./utils/prompts');
-const { getPullRequestData } = require('./requests/github');
-const { hasLabel, loadCustomTemplate, titleSysInstruction, descriptionSysInstruction } = require('./utils/helpers');
+const { MESSAGES } = require('./utils/constants');
+const PRValidator = require('./validators/PRValidator');
+const PRContentGenerator = require('./generators/PRContentGenerator');
+
+async function findPR(octokit) {
+  if (github.context.payload.pull_request) {
+    return github.context.payload.pull_request;
+  }
+
+  if (github.context.eventName === 'push') {
+    return await findPRByCommit(octokit);
+  }
+
+  return null;
+}
+
+async function findPRByCommit(octokit) {
+  core.info('Evento de push detectado, procurando PRs associados...');
+  const sha = github.context.sha;
+
+  try {
+    const { data: pullRequests } = await octokit.rest.pulls.list({
+      owner: github.context.repo.owner,
+      repo: github.context.repo.repo,
+      state: 'open'
+    });
+
+    core.info(`Encontrados ${pullRequests.length} PRs abertos no repositório`);
+
+    for (const pullRequest of pullRequests) {
+      const pr = await findPRWithCommit(octokit, pullRequest, sha);
+      if (pr) return pr;
+    }
+  } catch (error) {
+    core.warning(`Erro ao listar PRs: ${error.message}`);
+  }
+
+  return null;
+}
+
+async function findPRWithCommit(octokit, pullRequest, sha) {
+  core.info(`Verificando commits do PR #${pullRequest.number}...`);
+  try {
+    const { data: commits } = await octokit.rest.pulls.listCommits({
+      owner: github.context.repo.owner,
+      repo: github.context.repo.repo,
+      pull_number: pullRequest.number
+    });
+
+    core.info(`PR #${pullRequest.number} tem ${commits.length} commits`);
+
+    if (commits.some(commit => commit.sha === sha)) {
+      core.info(`PR #${pullRequest.number} encontrado relacionado ao commit ${sha}`);
+      return pullRequest;
+    }
+  } catch (error) {
+    core.warning(`Erro ao buscar commits do PR #${pullRequest.number}: ${error.message}`);
+  }
+
+  return null;
+}
 
 async function run() {
   try {
-    const githubToken = core.getInput('github-token', { required: true });
-    const geminiKey = core.getInput('gemini-token', { required: true });
+    core.info('Iniciando verificação do PR...');
+    const token = core.getInput('github-token');
+    const customToken = core.getInput('custom-token') || token;
+    const language = core.getInput('language') || 'pt';
+    const msgTexts = MESSAGES[language] || MESSAGES.pt;
+    const geminiKey = core.getInput('gemini-token');
     const customTemplatePath = core.getInput('custom-pr-template-path');
 
-    const octokit = github.getOctokit(githubToken);
-    const context = github.context;
-    const pr = context.payload.pull_request;
+    core.info('Token obtido, inicializando octokit...');
+    const octokit = github.getOctokit(token);
+    const commentOctokit = customToken !== token ? github.getOctokit(customToken) : octokit;
 
-    if (!pr) return core.setFailed('A ação deve ser executada em um PR.');
-
-    const { owner, repo } = context.repo;
-    const prNumber = pr.number;
-    const labels = pr.labels;
-
-    const generateTitle = hasLabel(labels, 'generate-title') || hasLabel(labels, 'generate-full-pr');
-    const generateDescription = hasLabel(labels, 'generate-description') || hasLabel(labels, 'generate-full-pr');
-
-    if (!generateTitle && !generateDescription) {
-      return core.info('Nenhuma label de geração detectada.');
+    const pr = await findPR(octokit);
+    if (!pr) {
+      core.info("Nenhum PR encontrado para verificar.");
+      return;
     }
 
-    const { commitMessages, modifiedFiles } = await getPullRequestData(octokit, owner, repo, prNumber);
+    const validator = new PRValidator(octokit, commentOctokit, msgTexts);
+    await validator.validate(pr);
 
-    const customTemplate = loadCustomTemplate(customTemplatePath);
-
-    const updates = {};
-
-    if (generateTitle) {
-      const prompt = buildTitlePrompt(commitMessages);
-      updates.title = await callGemini(prompt, geminiKey, titleSysInstruction);
-      core.info(`✅ Novo título: ${updates.title}`);
+    if (geminiKey) {
+      const generator = new PRContentGenerator(octokit, geminiKey, customTemplatePath);
+      await generator.generate(pr);
     }
 
-    if (generateDescription) {
-      const prompt = buildDescriptionPrompt(modifiedFiles, customTemplate);
-      updates.body = await callGemini(prompt, geminiKey, descriptionSysInstruction, 500);
-      core.info(`📝 Nova descrição gerada.`);
-    }
-
-    await octokit.rest.pulls.update({
-      owner,
-      repo,
-      pull_number: prNumber,
-      ...updates,
-    });
-
-    core.info('🎉 PR atualizado com sucesso!');
   } catch (error) {
-    core.setFailed(`Erro: ${error.message}`);
+    core.error(`Erro ao executar action: ${error.message}`);
+    if (error.stack) {
+      core.debug(`Stack trace: ${error.stack}`);
+    }
+    core.setFailed(error.message);
   }
 }
 

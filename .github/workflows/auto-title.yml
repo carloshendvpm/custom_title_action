@@ -2,19 +2,18 @@ name: Auto Title PR with Gemini
 
 on:
   pull_request:
-    types: [labeled]
+    types: [opened, edited, labeled]
 
 permissions:
   pull-requests: write
   contents: read
 
 jobs:
-  generate-title:
-    if: github.event.label.name == 'generate-title' || github.event.label.name == 'generate-full-pr' || github.event.label.name == 'generate-description'
+  validate-and-generate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Generate PR Title
+      - name: Validate and Generate PR Content
         uses: ./
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
