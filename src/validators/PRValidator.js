@@ -13,11 +13,10 @@ class PRValidator {
     const missingFields = this.checkRequiredFields(pr);
 
     if (missingFields.length > 0) {
-      return await this.handleMissingFields(pr, missingFields);
+      await this.handleMissingFields(pr, missingFields);
+    } else {
+      core.info(`✅ PR #${pr.number} possui todos os campos obrigatórios preenchidos.`);
     }
-
-    core.info(`✅ PR #${pr.number} possui todos os campos obrigatórios preenchidos.`);
-    return true;
   }
 
   checkRequiredFields(pr) {
@@ -49,10 +48,8 @@ class PRValidator {
     try {
       await this.addComment(pr, message);
       core.warning("PR está incompleto. Veja o comentário adicionado.");
-      return false;
     } catch (error) {
       this.handleCommentError(error);
-      return false;
     }
   }
 

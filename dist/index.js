@@ -55058,7 +55058,8 @@ class PRContentGenerator {
     const { shouldGenerateTitle, shouldGenerateDescription } = this.checkGenerationLabels(pr.labels);
 
     if (!shouldGenerateTitle && !shouldGenerateDescription) {
-      return core.info('Nenhuma label de geração detectada.');
+      core.info('Nenhuma label de geração detectada. Adicione uma das labels: generate-title, generate-description ou generate-full-pr');
+      return;
     }
 
     const { commitMessages, modifiedFiles } = await getPullRequestData(this.octokit, this.owner, this.repo, pr.number);
@@ -55297,11 +55298,10 @@ class PRValidator {
     const missingFields = this.checkRequiredFields(pr);
 
     if (missingFields.length > 0) {
-      return await this.handleMissingFields(pr, missingFields);
+      await this.handleMissingFields(pr, missingFields);
+    } else {
+      core.info(`✅ PR #${pr.number} possui todos os campos obrigatórios preenchidos.`);
     }
-
-    core.info(`✅ PR #${pr.number} possui todos os campos obrigatórios preenchidos.`);
-    return true;
   }
 
   checkRequiredFields(pr) {
@@ -55333,10 +55333,8 @@ class PRValidator {
     try {
       await this.addComment(pr, message);
       core.warning("PR está incompleto. Veja o comentário adicionado.");
-      return false;
     } catch (error) {
       this.handleCommentError(error);
-      return false;
     }
   }
 
@@ -77880,13 +77878,11 @@ async function run() {
     }
 
     const validator = new PRValidator(octokit, commentOctokit, msgTexts);
-    const fieldsAreValid = await validator.validate(pr);
+    await validator.validate(pr);
 
-    if (fieldsAreValid && geminiKey) {
+    if (geminiKey) {
       const generator = new PRContentGenerator(octokit, geminiKey, customTemplatePath);
       await generator.generate(pr);
-    } else if (!fieldsAreValid) {
-      core.setFailed("PR está incompleto. Por favor, preencha todos os campos obrigatórios.");
     }
 
   } catch (error) {

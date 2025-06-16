@@ -18,7 +18,8 @@ class PRContentGenerator {
     const { shouldGenerateTitle, shouldGenerateDescription } = this.checkGenerationLabels(pr.labels);
 
     if (!shouldGenerateTitle && !shouldGenerateDescription) {
-      return core.info('Nenhuma label de geração detectada.');
+      core.info('Nenhuma label de geração detectada. Adicione uma das labels: generate-title, generate-description ou generate-full-pr');
+      return;
     }
 
     const { commitMessages, modifiedFiles } = await getPullRequestData(this.octokit, this.owner, this.repo, pr.number);

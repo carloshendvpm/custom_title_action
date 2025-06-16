@@ -83,13 +83,11 @@ async function run() {
     }
 
     const validator = new PRValidator(octokit, commentOctokit, msgTexts);
-    const fieldsAreValid = await validator.validate(pr);
+    await validator.validate(pr);
 
-    if (fieldsAreValid && geminiKey) {
+    if (geminiKey) {
       const generator = new PRContentGenerator(octokit, geminiKey, customTemplatePath);
       await generator.generate(pr);
-    } else if (!fieldsAreValid) {
-      core.setFailed("PR está incompleto. Por favor, preencha todos os campos obrigatórios.");
     }
 
   } catch (error) {
