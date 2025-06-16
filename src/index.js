@@ -19,6 +19,7 @@ async function findPR(octokit) {
 async function findPRByCommit(octokit) {
   core.info('Evento de push detectado, procurando PRs associados...');
   const sha = github.context.sha;
+
   try {
     const { data: pullRequests } = await octokit.rest.pulls.list({
       owner: github.context.repo.owner,
@@ -87,6 +88,8 @@ async function run() {
     if (fieldsAreValid && geminiKey) {
       const generator = new PRContentGenerator(octokit, geminiKey, customTemplatePath);
       await generator.generate(pr);
+    } else if (!fieldsAreValid) {
+      core.setFailed("PR está incompleto. Por favor, preencha todos os campos obrigatórios.");
     }
 
   } catch (error) {

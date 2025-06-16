@@ -48,7 +48,7 @@ class PRValidator {
     
     try {
       await this.addComment(pr, message);
-      core.setFailed("PR está incompleto. Veja o comentário adicionado.");
+      core.warning("PR está incompleto. Veja o comentário adicionado.");
       return false;
     } catch (error) {
       this.handleCommentError(error);
@@ -57,7 +57,16 @@ class PRValidator {
   }
 
   generateCommentMessage(missingFields) {
-    return `## ⚠️ Campos Obrigatórios Faltando\n\n${missingFields.join('\n')}`;
+    return `## ⚠️ Campos Obrigatórios Faltando
+
+Por favor, preencha os seguintes campos obrigatórios para prosseguir:
+
+${missingFields.join('\n')}
+
+Após preencher os campos, você pode:
+1. Adicionar a label \`generate-title\` para gerar um título
+2. Adicionar a label \`generate-description\` para gerar uma descrição
+3. Adicionar a label \`generate-full-pr\` para gerar título e descrição`;
   }
 
   async addComment(pr, message) {
