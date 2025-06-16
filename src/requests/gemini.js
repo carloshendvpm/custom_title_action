@@ -1,9 +1,6 @@
 const { GoogleGenAI } = require('@google/genai');
 const core = require('@actions/core');
 
-
-
-
 async function callGemini(prompt, geminiKey, systemInstruction, maxOutputTokens = 80) {
   try {
     const ai = new GoogleGenAI({ apiKey: geminiKey });
