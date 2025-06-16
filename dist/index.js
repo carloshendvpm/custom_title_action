@@ -54981,13 +54981,150 @@ function socketOnError() {
 
 /***/ }),
 
+/***/ 7774:
+/***/ ((module) => {
+
+const MESSAGES = {
+  pt: {
+    milestoneMissing: '❌ Milestone não definida',
+    assigneesMissing: '❌ Assignees não definidos',
+    labelsMissing: '❌ Labels não definidas',
+  },
+  en: {
+    milestoneMissing: '❌ Milestone not defined',
+    assigneesMissing: '❌ Assignees not defined',
+    labelsMissing: '❌ Labels not defined',
+  }
+};
+
+const LABELS = {
+  GENERATE_TITLE: 'generate-title',
+  GENERATE_DESCRIPTION: 'generate-description',
+  GENERATE_FULL_PR: 'generate-full-pr'
+};
+
+const GEMINI_CONFIG = {
+  MODEL: 'gemini-2.0-flash',
+  TEMPERATURE: 0.1,
+  MAX_OUTPUT_TOKENS: {
+    TITLE: 80,
+    DESCRIPTION: 500
+  }
+};
+
+const SYSTEM_INSTRUCTIONS = {
+  TITLE: `Você é um assistente que gera títulos de Pull Request no estilo Conventional Commits.
+  Regras:
+  - Gere apenas 1 título.
+  - Máximo de 70 caracteres.
+  - Não explique nem justifique o título.
+  - Não adicione ponto final.
+  - Use apenas os tipos: feat, fix, chore, docs, refactor, test.
+  - Combine mensagens similares em um só título se necessário.`,
+
+  DESCRIPTION: `Você é um assistente técnico. Gere uma descrição de Pull Request com base nos arquivos modificados listados abaixo. 
+  Use tópicos curtos para descrever o que foi alterado, com foco em clareza e impacto técnico.`
+};
+
+module.exports = {
+  MESSAGES,
+  LABELS,
+  GEMINI_CONFIG,
+  SYSTEM_INSTRUCTIONS
+}; 
+
+/***/ }),
+
+/***/ 8839:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const core = __nccwpck_require__(4685);
+const github = __nccwpck_require__(5793);
+const { callGemini } = __nccwpck_require__(8632);
+const { buildTitlePrompt, buildDescriptionPrompt } = __nccwpck_require__(8289);
+const { getPullRequestData } = __nccwpck_require__(8664);
+const { hasLabel, loadCustomTemplate, titleSysInstruction, descriptionSysInstruction } = __nccwpck_require__(9635);
+
+class PRContentGenerator {
+  constructor(octokit, geminiKey, customTemplatePath) {
+    this.octokit = octokit;
+    this.geminiKey = geminiKey;
+    this.customTemplatePath = customTemplatePath;
+    this.owner = github.context.repo.owner;
+    this.repo = github.context.repo.repo;
+  }
+
+  async generate(pr) {
+    const { shouldGenerateTitle, shouldGenerateDescription } = this.checkGenerationLabels(pr.labels);
+
+    if (!shouldGenerateTitle && !shouldGenerateDescription) {
+      return core.info('Nenhuma label de geração detectada.');
+    }
+
+    const { commitMessages, modifiedFiles } = await getPullRequestData(this.octokit, this.owner, this.repo, pr.number);
+    const customTemplate = loadCustomTemplate(this.customTemplatePath);
+    const updates = {};
+
+    if (shouldGenerateTitle) {
+      updates.title = await this.generateTitle(commitMessages);
+    }
+
+    if (shouldGenerateDescription) {
+      updates.body = await this.generateDescription(modifiedFiles, customTemplate);
+    }
+
+    await this.updatePR(pr.number, updates);
+  }
+
+  checkGenerationLabels(labels) {
+    const generateTitle = hasLabel(labels, 'generate-title') || hasLabel(labels, 'generate-full-pr');
+    const generateDescription = hasLabel(labels, 'generate-description') || hasLabel(labels, 'generate-full-pr');
+
+    return { shouldGenerateTitle: generateTitle, shouldGenerateDescription: generateDescription };
+  }
+
+  async generateTitle(commitMessages) {
+    const prompt = buildTitlePrompt(commitMessages);
+    const title = await callGemini(prompt, this.geminiKey, titleSysInstruction);
+    core.info(`✅ Novo título: ${title}`);
+    return title;
+  }
+
+  async generateDescription(modifiedFiles, customTemplate) {
+    const prompt = buildDescriptionPrompt(modifiedFiles, customTemplate);
+    const description = await callGemini(prompt, this.geminiKey, descriptionSysInstruction, 500);
+    core.info(`📝 Nova descrição gerada.`);
+    return description;
+  }
+
+  async updatePR(prNumber, updates) {
+    try {
+      await this.octokit.rest.pulls.update({
+        owner: this.owner,
+        repo: this.repo,
+        pull_number: prNumber,
+        ...updates,
+      });
+      core.info('🎉 PR atualizado com sucesso!');
+    } catch (error) {
+      core.error(`Erro ao atualizar PR: ${error.message}`);
+      throw error;
+    }
+  }
+}
+
+module.exports = PRContentGenerator; 
+
+/***/ }),
+
 /***/ 8632:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 const { GoogleGenAI } = __nccwpck_require__(6252);
 const core = __nccwpck_require__(4685);
+const { GEMINI_CONFIG } = __nccwpck_require__(7774);
 
-async function callGemini(prompt, geminiKey, systemInstruction, maxOutputTokens = 80) {
+async function callGemini(prompt, geminiKey, systemInstruction, maxOutputTokens = GEMINI_CONFIG.MAX_OUTPUT_TOKENS.TITLE) {
   try {
     const ai = new GoogleGenAI({ apiKey: geminiKey });
     const contents = [];
@@ -54995,17 +55132,23 @@ async function callGemini(prompt, geminiKey, systemInstruction, maxOutputTokens 
     contents.push({ role: 'user', parts: [{ text: prompt }] });
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: GEMINI_CONFIG.MODEL,
       contents: contents,
       config: {
         maxOutputTokens: maxOutputTokens,
-        systemInstruction: systemInstruction || "Você é um assistente de IA especializado em ajudar desenvolvedores a criar títulos e descrições de PRs no GitHub.",
-        temperature: 0.1,
+        systemInstruction: systemInstruction,
+        temperature: GEMINI_CONFIG.TEMPERATURE,
       },
     });
-    return response?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+    const result = response?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if (!result) {
+      throw new Error('Resposta vazia do Gemini');
+    }
+
+    return result;
   } catch(error) {
-    core.setFailed(`Erro ao chamar Gemini: ${error.message}`);
+    core.error(`Erro ao chamar Gemini: ${error.message}`);
     throw error; 
   }
 }
@@ -55133,6 +55276,100 @@ function buildDescriptionPrompt(modifiedFiles) {
 
 module.exports = { buildTitlePrompt, buildDescriptionPrompt };
 
+
+/***/ }),
+
+/***/ 9454:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const core = __nccwpck_require__(4685);
+const github = __nccwpck_require__(5793);
+
+class PRValidator {
+  constructor(octokit, commentOctokit, msgTexts) {
+    this.octokit = octokit;
+    this.commentOctokit = commentOctokit;
+    this.msgTexts = msgTexts;
+  }
+
+  async validate(pr) {
+    core.info('Verificando campos obrigatórios do PR...');
+    const missingFields = this.checkRequiredFields(pr);
+
+    if (missingFields.length > 0) {
+      return await this.handleMissingFields(pr, missingFields);
+    }
+
+    core.info(`✅ PR #${pr.number} possui todos os campos obrigatórios preenchidos.`);
+    return true;
+  }
+
+  checkRequiredFields(pr) {
+    const missingFields = [];
+
+    if (!pr.milestone) {
+      missingFields.push(this.msgTexts.milestoneMissing);
+      core.info('Milestone não encontrada');
+    }
+
+    if (!pr.assignees || pr.assignees.length === 0) {
+      missingFields.push(this.msgTexts.assigneesMissing);
+      core.info('Assignees não encontrados');
+    }
+
+    if (!pr.labels || pr.labels.length === 0) {
+      missingFields.push(this.msgTexts.labelsMissing);
+      core.info('Labels não encontradas');
+    }
+
+    return missingFields;
+  }
+
+  async handleMissingFields(pr, missingFields) {
+    const message = this.generateCommentMessage(missingFields);
+    
+    core.info('Campos obrigatórios faltando, tentando adicionar comentário...');
+    
+    try {
+      await this.addComment(pr, message);
+      core.setFailed("PR está incompleto. Veja o comentário adicionado.");
+      return false;
+    } catch (error) {
+      this.handleCommentError(error);
+      return false;
+    }
+  }
+
+  generateCommentMessage(missingFields) {
+    return `## ⚠️ Campos Obrigatórios Faltando\n\n${missingFields.join('\n')}`;
+  }
+
+  async addComment(pr, message) {
+    core.info(`Criando comentário no PR #${pr.number}`);
+    core.info(`Proprietário do repositório: ${github.context.repo.owner}`);
+    core.info(`Nome do repositório: ${github.context.repo.repo}`);
+    
+    await this.commentOctokit.rest.issues.createComment({
+      owner: github.context.repo.owner,
+      repo: github.context.repo.repo,
+      issue_number: pr.number,
+      body: message
+    });
+    
+    core.info('Comentário adicionado com sucesso');
+  }
+
+  handleCommentError(error) {
+    core.error(`Erro ao criar comentário: ${error.message}`);
+    if (error.message.includes('Resource not accessible by integration')) {
+      core.error('ERRO DE PERMISSÃO: Verifique se o token tem permissão para escrever em issues/pull requests');
+      core.error('Adicione "permissions: { issues: write, pull-requests: write }" ao seu arquivo de workflow');
+    }
+    core.setFailed(`Não foi possível adicionar o comentário: ${error.message}`);
+  }
+}
+
+module.exports = PRValidator; 
 
 /***/ }),
 
@@ -77551,178 +77788,97 @@ module.exports = /*#__PURE__*/JSON.parse('[[[0,44],"disallowed_STD3_valid"],[[45
 var __webpack_exports__ = {};
 const core = __nccwpck_require__(4685);
 const github = __nccwpck_require__(5793);
-const { MESSAGES, generatePRCommentMessage } = __nccwpck_require__(1971);
-const { callGemini } = __nccwpck_require__(8632);
-const { buildTitlePrompt, buildDescriptionPrompt } = __nccwpck_require__(8289);
-const { getPullRequestData } = __nccwpck_require__(8664);
-const { hasLabel, loadCustomTemplate, titleSysInstruction, descriptionSysInstruction } = __nccwpck_require__(9635);
+const { MESSAGES } = __nccwpck_require__(1971);
+const PRValidator = __nccwpck_require__(9454);
+const PRContentGenerator = __nccwpck_require__(8839);
 
-async function checkPRFields(pr, octokit, commentOctokit, msgTexts) {
-  core.info('Verifying required PR fields...');
-  const missingFields = [];
-
-  if (!pr.milestone) {
-    missingFields.push(msgTexts.milestoneMissing);
-    core.info('Milestone not found');
+async function findPR(octokit) {
+  if (github.context.payload.pull_request) {
+    return github.context.payload.pull_request;
   }
 
-  if (!pr.assignees || pr.assignees.length === 0) {
-    missingFields.push(msgTexts.assigneesMissing);
-    core.info('Assignees not found');
+  if (github.context.eventName === 'push') {
+    return await findPRByCommit(octokit);
   }
 
-  if (!pr.labels || pr.labels.length === 0) {
-    missingFields.push(msgTexts.labelsMissing);
-    core.info('Labels not found');
-  }
-
-  if (missingFields.length > 0) {
-    const message = generatePRCommentMessage(msgTexts, missingFields);
-    
-    core.info('Missing required fields, trying to add comment...');
-    
-    try {
-      core.info(`Creating comment on PR #${pr.number}`);
-      core.info(`Repository owner: ${github.context.repo.owner}`);
-      core.info(`Repository name: ${github.context.repo.repo}`);
-      
-      await commentOctokit.rest.issues.createComment({
-        owner: github.context.repo.owner,
-        repo: github.context.repo.repo,
-        issue_number: pr.number,
-        body: message
-      });
-      
-      core.info('Comment added successfully');
-      core.setFailed("PR is incomplete. See the added comment.");
-      return false;
-    } catch (commentError) {
-      core.error(`Error creating comment: ${commentError.message}`);
-      if (commentError.message.includes('Resource not accessible by integration')) {
-        core.error('PERMISSION ERROR: Check if the token has permission to write in issues/pull requests');
-        core.error('Add "permissions: { issues: write, pull-requests: write }" to your workflow file');
-      }
-      core.setFailed(`Unable to add comment: ${commentError.message}`);
-      return false;
-    }
-  } else {
-    core.info(`✅ PR #${pr.number} has all required fields filled.`);
-    return true;
-  }
+  return null;
 }
 
-async function generatePRContent(pr, octokit, geminiKey, customTemplatePath) {
-  const { owner, repo } = github.context.repo;
-  const prNumber = pr.number;
-  const labels = pr.labels;
+async function findPRByCommit(octokit) {
+  core.info('Evento de push detectado, procurando PRs associados...');
+  const sha = github.context.sha;
+  try {
+    const { data: pullRequests } = await octokit.rest.pulls.list({
+      owner: github.context.repo.owner,
+      repo: github.context.repo.repo,
+      state: 'open'
+    });
 
-  const generateTitle = hasLabel(labels, 'generate-title') || hasLabel(labels, 'generate-full-pr');
-  const generateDescription = hasLabel(labels, 'generate-description') || hasLabel(labels, 'generate-full-pr');
+    core.info(`Encontrados ${pullRequests.length} PRs abertos no repositório`);
 
-  if (!generateTitle && !generateDescription) {
-    return core.info('Nenhuma label de geração detectada.');
+    for (const pullRequest of pullRequests) {
+      const pr = await findPRWithCommit(octokit, pullRequest, sha);
+      if (pr) return pr;
+    }
+  } catch (error) {
+    core.warning(`Erro ao listar PRs: ${error.message}`);
   }
 
-  const { commitMessages, modifiedFiles } = await getPullRequestData(octokit, owner, repo, prNumber);
-  const customTemplate = loadCustomTemplate(customTemplatePath);
-  const updates = {};
+  return null;
+}
 
-  if (generateTitle) {
-    const prompt = buildTitlePrompt(commitMessages);
-    updates.title = await callGemini(prompt, geminiKey, titleSysInstruction);
-    core.info(`✅ Novo título: ${updates.title}`);
+async function findPRWithCommit(octokit, pullRequest, sha) {
+  core.info(`Verificando commits do PR #${pullRequest.number}...`);
+  try {
+    const { data: commits } = await octokit.rest.pulls.listCommits({
+      owner: github.context.repo.owner,
+      repo: github.context.repo.repo,
+      pull_number: pullRequest.number
+    });
+
+    core.info(`PR #${pullRequest.number} tem ${commits.length} commits`);
+
+    if (commits.some(commit => commit.sha === sha)) {
+      core.info(`PR #${pullRequest.number} encontrado relacionado ao commit ${sha}`);
+      return pullRequest;
+    }
+  } catch (error) {
+    core.warning(`Erro ao buscar commits do PR #${pullRequest.number}: ${error.message}`);
   }
 
-  if (generateDescription) {
-    const prompt = buildDescriptionPrompt(modifiedFiles, customTemplate);
-    updates.body = await callGemini(prompt, geminiKey, descriptionSysInstruction, 500);
-    core.info(`📝 Nova descrição gerada.`);
-  }
-
-  await octokit.rest.pulls.update({
-    owner,
-    repo,
-    pull_number: prNumber,
-    ...updates,
-  });
-
-  core.info('🎉 PR atualizado com sucesso!');
+  return null;
 }
 
 async function run() {
   try {
-    core.info('Starting PR check...');
+    core.info('Iniciando verificação do PR...');
     const token = core.getInput('github-token');
     const customToken = core.getInput('custom-token') || token;
     const language = core.getInput('language') || 'pt';
     const msgTexts = MESSAGES[language] || MESSAGES.pt;
     const geminiKey = core.getInput('gemini-token');
     const customTemplatePath = core.getInput('custom-pr-template-path');
-    
-    core.info('Token obtained, initializing octokit...');
-    const octokit = github.getOctokit(token);
-    const commentOctokit = customToken !== token ? github.getOctokit(customToken) : octokit;    
-    core.info(`Event context: ${github.context.eventName}`);
-    core.info(`Repository: ${github.context.repo.owner}/${github.context.repo.repo}`);
-    
-    let pr;
-    
-    if (github.context.payload.pull_request) {
-      pr = github.context.payload.pull_request;
-      core.info(`Processing pull request #${pr.number}`);
-    } 
-    else if (github.context.eventName === 'push') {
-      core.info('Push event detected, searching for associated PRs...');
-      
-      const sha = github.context.sha;
-      core.info(`Current commit SHA: ${sha}`);
-      
-      try {
-        const { data: pullRequests } = await octokit.rest.pulls.list({
-          owner: github.context.repo.owner,
-          repo: github.context.repo.repo,
-          state: 'open'
-        });
-        
-        core.info(`Found ${pullRequests.length} open PRs in the repository`);
-        
-        for (const pullRequest of pullRequests) {
-          core.info(`Checking commits of PR #${pullRequest.number}...`);
-          try {
-            const { data: commits } = await octokit.rest.pulls.listCommits({
-              owner: github.context.repo.owner,
-              repo: github.context.repo.repo,
-              pull_number: pullRequest.number
-            });
-            
-            core.info(`PR #${pullRequest.number} has ${commits.length} commits`);
-            
-            if (commits.some(commit => commit.sha === sha)) {
-              pr = pullRequest;
-              core.info(`Found PR #${pr.number} related to commit ${sha}`);
-              break;
-            }
-          } catch (commitError) {
-            core.warning(`Error searching commits for PR #${pullRequest.number}: ${commitError.message}`);
-          }
-        }
-      } catch (prListError) {
-        core.warning(`Erro ao listar PRs: ${prListError.message}`);
-      }
-    }
 
+    core.info('Token obtido, inicializando octokit...');
+    const octokit = github.getOctokit(token);
+    const commentOctokit = customToken !== token ? github.getOctokit(customToken) : octokit;
+
+    const pr = await findPR(octokit);
     if (!pr) {
-      core.info("No PR found to verify.");
+      core.info("Nenhum PR encontrado para verificar.");
       return;
     }
 
-    const fieldsAreValid = await checkPRFields(pr, octokit, commentOctokit, msgTexts);
+    const validator = new PRValidator(octokit, commentOctokit, msgTexts);
+    const fieldsAreValid = await validator.validate(pr);
+
     if (fieldsAreValid && geminiKey) {
-      await generatePRContent(pr, octokit, geminiKey, customTemplatePath);
+      const generator = new PRContentGenerator(octokit, geminiKey, customTemplatePath);
+      await generator.generate(pr);
     }
 
   } catch (error) {
-    core.error(`Error executing action: ${error.message}`);
+    core.error(`Erro ao executar action: ${error.message}`);
     if (error.stack) {
       core.debug(`Stack trace: ${error.stack}`);
     }
